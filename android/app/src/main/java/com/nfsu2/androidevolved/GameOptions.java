@@ -26,23 +26,23 @@ final class GameOptions {
     static final Option[] ALL = {
             new Option(RESOLUTION, "Resolusi internal", "75",
                     new String[] {"100", "75", "50", "720"},
-                    new String[] {"Asli · kualitas tertinggi", "75% · seimbang", "50% · kinerja maksimal"
-                            "1280×720 · 16:9"}),
+                    new String[] {"Asli kualitas tertinggi", "75% seimbang", "50% kinerja maksimal",
+                            "16:9"}),
             new Option(FPS, "Batas FPS", "120",
                     new String[] {"30", "60", "90", "120", "0"},
-                    new String[] {"30 FPS · menghemat baterai", "60 FPS", "90 FPS", "120 FPS", "Sin límite"}),
+                    new String[] {"30 FPS menghemat baterai", "60 FPS", "90 FPS", "120 FPS", "Tidak ada batasan"}),
             new Option(WIDESCREEN, "Layar lebar", "on",
                     new String[] {"on", "off"},
                     new String[] {"HUD dan kamera diperbaiki", "Original 4:3 membentang"}),
-            new Option(MINIMAP, "Minimal", "top",
+            new Option(MINIMAP, "Minimap", "top",
                     new String[] {"top", "bottom"},
                     new String[] {"kiri atas", "Kiri bawah (original)"}),
             new Option(LATENCY, "Sinkronisasi CPU/GPU", "2",
                     new String[] {"2", "1"},
-                    new String[] {"Kinerja · CPU dan GPU secara paralel", "Latensi rendah · FPS lebih sedikit"}),
+                    new String[] {"Kinerja CPU dan GPU secara paralel", "Latensi rendah FPS lebih sedikit"}),
             new Option(TEXTURES, "Tekstur terkompresi", "auto",
                     new String[] {"auto", "cpu"},
-                    new String[] {"Otomatis · GPU jika didukung", "Konversikan ke kompatibilitas CPU"}),
+                    new String[] {"Otomatis GPU jika didukung", "Konversikan ke kompatibilitas CPU"}),
     };
 
     private static final String PREFS = "nfsu2_game";
