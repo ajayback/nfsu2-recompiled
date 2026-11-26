@@ -12,8 +12,10 @@ git clone --branch native-1.9.2b https://github.com/Joshua-Ashton/dxvk-native.gi
 python ports/dxvk_android/prepare.py ../reference/dxvk-native build/dxvk-source
 ```
 
-Run shader generation with Python, `glslangValidator` and `spirv-val` available
-in the same environment (the development setup uses Ubuntu/WSL):
+On Windows, `build.bat` locates `glslangValidator` in the Android SDK and
+`spirv-val` in the selected NDK, then generates and validates shaders
+automatically. To generate them manually, put Python, `glslangValidator` and
+`spirv-val` on `PATH` and run:
 
 ```bash
 python3 ports/dxvk_android/shaders.py build/dxvk-source

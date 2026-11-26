@@ -29,6 +29,69 @@ def replace(path, old, new):
 
 replace("src/util/util_bit.h", "#pragma once", "#pragma once\n#include <cstdint>")
 replace("src/d3d9/d3d9_device.cpp", "enabled.core.features.textureCompressionBC = VK_TRUE;", "enabled.core.features.textureCompressionBC = supported.core.features.textureCompressionBC;")
+replace("src/d3d9/d3d9_device.cpp", "    enabled.core.features.occlusionQueryPrecise = VK_TRUE;",
+        "    enabled.core.features.occlusionQueryPrecise = supported.core.features.occlusionQueryPrecise;")
+replace("src/d3d9/d3d9_query.cpp",
+        "      case D3DQUERYTYPE_OCCLUSION:\n"
+        "        m_query[0] = dxvkDevice->createGpuQuery(\n"
+        "          VK_QUERY_TYPE_OCCLUSION,\n"
+        "          VK_QUERY_CONTROL_PRECISE_BIT, 0);",
+        "      case D3DQUERYTYPE_OCCLUSION: {\n"
+        "        VkQueryControlFlags flags = dxvkDevice->features().core.features.occlusionQueryPrecise\n"
+        "          ? VK_QUERY_CONTROL_PRECISE_BIT : 0;\n"
+        "        m_query[0] = dxvkDevice->createGpuQuery(\n"
+        "          VK_QUERY_TYPE_OCCLUSION, flags, 0);\n"
+        "      }")
+replace("src/dxvk/dxvk_adapter.cpp",
+        '    if (vr != VK_SUCCESS)\n'
+        '      throw DxvkError("DxvkAdapter: Failed to create device");',
+        '    if (vr != VK_SUCCESS)\n'
+        '      throw DxvkError(str::format("DxvkAdapter: Failed to create device (VkResult ", vr, ")"));')
+replace("src/d3d9/d3d9_interface.cpp",
+        "#include \"d3d9_interface.h\"",
+        "#include \"d3d9_interface.h\"\n\nextern \"C\" void nfsD3D9SetCreateError(const char* message);")
+replace("src/d3d9/d3d9_interface.cpp",
+        "      HRESULT hr = device->InitialReset(pPresentationParameters, pFullscreenDisplayMode);\n"
+        "\n"
+        "      if (FAILED(hr))\n"
+        "        return hr;",
+        "      HRESULT hr = device->InitialReset(pPresentationParameters, pFullscreenDisplayMode);\n"
+        "\n"
+        "      if (FAILED(hr)) {\n"
+        "        Logger::err(str::format(\"D3D9InterfaceEx::CreateDeviceEx: InitialReset failed with HRESULT \", hr));\n"
+        "        nfsD3D9SetCreateError(str::format(\"D3D9 initial reset failed with HRESULT \", hr).c_str());\n"
+        "        return hr;\n"
+        "      }")
+replace("src/d3d9/d3d9_interface.cpp",
+        "      Logger::err(e.message());\n"
+        "      return D3DERR_NOTAVAILABLE;",
+        "      Logger::err(e.message());\n"
+        "      nfsD3D9SetCreateError(e.message().c_str());\n"
+        "      return D3DERR_NOTAVAILABLE;")
+replace("src/dxvk/dxvk_extensions.h",
+        "DxvkExt khrImageFormatList                = { VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME,                  DxvkExtMode::Required };",
+        "DxvkExt khrImageFormatList                = { VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME,                  DxvkExtMode::Optional };")
+replace("src/dxvk/dxvk_image.h",
+        "            DxvkMemoryAllocator&  memAlloc,\n"
+        "            VkMemoryPropertyFlags memFlags);",
+        "            DxvkMemoryAllocator&  memAlloc,\n"
+        "            VkMemoryPropertyFlags memFlags,\n"
+        "            bool                  useFormatList);")
+replace("src/dxvk/dxvk_image.cpp",
+        "          DxvkMemoryAllocator&  memAlloc,\n"
+        "          VkMemoryPropertyFlags memFlags)\n"
+        "  : m_vkd(vkd), m_info(createInfo), m_memFlags(memFlags) {",
+        "          DxvkMemoryAllocator&  memAlloc,\n"
+        "          VkMemoryPropertyFlags memFlags,\n"
+        "          bool                  useFormatList)\n"
+        "  : m_vkd(vkd), m_info(createInfo), m_memFlags(memFlags) {")
+replace("src/dxvk/dxvk_image.cpp",
+        "    info.pNext                 = &formatList;",
+        "    info.pNext                 = useFormatList ? &formatList : nullptr;")
+replace("src/dxvk/dxvk_device.cpp",
+        "    return new DxvkImage(m_vkd, createInfo, m_objects.memoryManager(), memoryType);",
+        "    return new DxvkImage(m_vkd, createInfo, m_objects.memoryManager(), memoryType,\n"
+        "      m_extensions.khrImageFormatList);")
 
 replace("src/util/util_bit.h", "#ifndef _MSC_VER", "#if defined(__i386__) || defined(__x86_64__)\n#ifndef _MSC_VER")
 replace("src/util/util_bit.h", '#include "util_likely.h"', '#endif // x86 intrinsics\n#include "util_likely.h"')

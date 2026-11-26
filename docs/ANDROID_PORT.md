@@ -14,7 +14,7 @@ MSVC x86 reference build. CRT bring-up is connected; the APK is not playable.
 
 ## Diagnostic renderer and storage foundation
 
-- Android NativeActivity, Android 8+ (API 26), arm64-v8a only.
+- Android NativeActivity, Android 10+ (API 29), arm64-v8a by default.
 - Vulkan instance requesting 1.1, graphics/present queue and FIFO swapchain.
 - Render-pass clear and presentation using only Vulkan 1.1 core and Android
   surface/swapchain extensions. No descriptor indexing, shaderInt64, buffer
@@ -29,28 +29,54 @@ MSVC x86 reference build. CRT bring-up is connected; the APK is not playable.
   ranges that wrap. The class is connected to ADDR, the PE loader and explicit
   guest calls; guest heap services are implemented. Reservation is not 4 GiB of
   physical RAM.
-- Fixed game root: `/storage/emulated/0/nfsu2` (Internal storage/nfsu2).
-  The application checks readable data folders and executable header/size.
-  Android 11+ uses the all-files access settings screen; Android 8–10 requests
+- Game files can be stored at `/storage/emulated/0/nfsu2` or
+  `/storage/<volume>/nfsu2` (for example, on removable storage). The launcher
+  discovers removable volumes from Android's external-volume directories
+  (with `/storage` as a fallback), then passes the selected game folder to the
+  native runtime so both use the same volume-specific root. On an SD card, put
+  `SPEED2.EXE` and the game folders directly under `nfsu2` at the card root;
+  grant all-files access and make sure the card is mounted. The application
+  checks readable data folders and executable header/size; rejected paths and
+  unreadable folders are reported in the `NFSU2` log.
+  Android 11+ uses the all-files access settings screen; Android 10 requests
   read permission. Files remain external to the APK.
 - Launcher icon from `ICONO/ICONO.png`, and a diagnostic status overlay.
 
 ## Build and inspect
 
-Install Android SDK platform 35, NDK 28.2.13676358, CMake 3.30.5, and a JDK
-compatible with Android Gradle Plugin 8.7.3. Set ANDROID_HOME and JAVA_HOME,
-or configure the SDK through Android Studio. From `android/`:
+Install Android SDK platform 35 and a JDK compatible with Android Gradle Plugin
+8.7.3. `build.bat` detects the newest NDK and CMake already installed under
+`ANDROID_SDK_ROOT`, `ANDROID_HOME`, `android/local.properties`, or the default
+Windows SDK directory. Set `ANDROID_HOME` and `JAVA_HOME`, or configure the SDK
+through Android Studio. From the repository root:
+
+```bat
+build.bat
+```
+
+By default this builds the ARM64 debug APK. To build the 32-bit APK instead:
+
+```bat
+set NFS_ABI=armeabi-v7a
+build.bat
+```
+
+The result is:
+`android/app/build/outputs/apk/debug/app-debug.apk`.
+
+To install manually:
 
 ```powershell
-./gradlew.bat --no-daemon assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n com.nfsu2.androidevolved/.LauncherActivity
 adb logcat -s NFSU2
 ```
 
-Copy files first with `scripts/copy_android_data.ps1 -GameRoot <installation>`
-and allow storage access when prompted. The launcher selects the game language
-before starting the guest. The following describes the historical bootstrap:
+Copy files first with `scripts/copy_android_data.ps1 -GameRoot <installation>`.
+To copy to a mounted volume, pass its path with
+`-DevicePath '/storage/<volume>/nfsu2'`. Allow storage access when prompted.
+The launcher selects the game language before starting the guest. The following
+describes the historical bootstrap:
 a dark teal screen and status
 text, `Guest memory self-check passed`, `Game data readable`, `Bootstrap ready`
 and `Presented frames` in logcat. Runtime 0.2.0 additionally attempts the actual
@@ -59,6 +85,13 @@ packaged; generated code from the owner's copy is included in this local APK.
 See [device test report](ANDROID_DEVICE_TEST.md) for version 0.1.0 real-device
 verification. Version 0.2.0 includes locally generated code and has now passed
 initial ARM64 runtime and Home/return checks; see ANDROID_RUNTIME.md for evidence.
+
+If startup reports `D3DERR_NOTAVAILABLE` (`HRESULT 0x8876086A`), storage was
+found but DXVK could not create the game's graphics device. Run **Probar
+driver** in the launcher: its report lists required Vulkan features the
+selected driver lacks. Try a system/updated GPU driver or a compatible custom
+driver; if required features are absent from the device, the game renderer
+cannot start on that GPU.
 
 ## Reference review
 

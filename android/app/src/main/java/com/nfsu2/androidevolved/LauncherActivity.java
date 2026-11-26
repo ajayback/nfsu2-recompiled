@@ -159,7 +159,7 @@ public final class LauncherActivity extends Activity {
         playParams.topMargin = dp(8);
         left.addView(play, playParams);
 
-        access = actionButton("Permitir acceso a memoria interna/nfsu2", false);
+        access = actionButton("Permitir acceso a carpeta nfsu2", false);
         access.setOnClickListener(view -> requestAccess());
         LinearLayout.LayoutParams accessParams = new LinearLayout.LayoutParams(-1, dp(46));
         accessParams.topMargin = dp(10);
@@ -204,8 +204,8 @@ public final class LauncherActivity extends Activity {
         boolean language = allowed && !languages().isEmpty();
         if (exe && !language) addCheck("Falta LANGUAGES/<idioma>.bin", false, true);
         boolean ready = exe && language;
-        status.setText(!allowed ? "Permite el acceso a archivos para leer memoria interna/nfsu2."
-                : ready ? "Memoria interna/nfsu2" : "Copia los archivos de tu juego en memoria interna/nfsu2.");
+        status.setText(!allowed ? "Permite el acceso a archivos para leer storage/nfsu2."
+                : ready ? root.getAbsolutePath() : "Copia los archivos del juego a storage/nfsu2 o /storage/<volumen>/nfsu2.");
         play.setEnabled(ready);
         play.setAlpha(ready ? 1f : .45f);
         access.setVisibility(allowed ? View.GONE : View.VISIBLE);
@@ -247,7 +247,7 @@ public final class LauncherActivity extends Activity {
 
     private void chooseLanguage() {
         List<String[]> found = allowed() ? languages() : new ArrayList<>();
-        if (found.isEmpty()) { message("Idioma", "No se encontraron idiomas en memoria interna/nfsu2/LANGUAGES."); return; }
+        if (found.isEmpty()) { message("Idioma", "No se encontraron idiomas en la carpeta nfsu2/LANGUAGES."); return; }
         String[] names = new String[found.size()];
         int checked = 0;
         for (int i = 0; i < names.length; i++) {
@@ -360,20 +360,36 @@ public final class LauncherActivity extends Activity {
         play.setEnabled(true);
         try {
             org.json.JSONObject gpu = new org.json.JSONObject(report);
-            boolean failed = gpu.optBoolean("driverLoadFailed") || gpu.has("probeError");
+            String probeError = gpu.optString("probeError", "");
+            boolean loaderFailed = gpu.optBoolean("driverLoadFailed") || !probeError.isEmpty();
+            boolean deviceFailed = gpu.optBoolean("deviceCreateFailed")
+                    || (gpu.has("logicalDeviceResult") && gpu.optInt("logicalDeviceResult") != 0);
+            boolean failed = loaderFailed || deviceFailed;
             if (playAfterProbe && !failed && gpu.optBoolean("compatible")) { playAfterProbe = false; launch(); return; }
             // The player pressed PLAY: a driver that loads but lacks a feature the
             // probe checks may still run the game (issue #1107), so offer it.
             boolean wantedToPlay = playAfterProbe && !failed;
             playAfterProbe = false;
-            String text = failed ? "No se pudo usar el driver: " + gpu.optString("probeError", "error al iniciar Vulkan.")
-                    : "GPU: " + gpu.optString("gpu") + "\nVulkan: " + gpu.optString("vulkan")
-                      + "\nDriver: " + gpu.optString("driverName", "—") + " " + gpu.optString("driverInfo", "")
-                      + "\nTexturas BC: " + (gpu.optBoolean("bcTextures") ? "en la GPU" : "se convierten en la CPU")
-                      + (gpu.optString("vertexFormatsMissing").isEmpty() ? ""
-                              : "\nTipos de vértice sin soporte: " + gpu.optString("vertexFormatsMissing"))
-                      + "\n" + (gpu.optBoolean("compatible") ? "Compatible con el juego."
-                              : "Faltan funciones: " + gpu.optJSONArray("missing"));
+            String text;
+            if (loaderFailed) {
+                text = "No se pudo iniciar Vulkan: "
+                        + (probeError.isEmpty() ? "error al cargar el driver." : probeError);
+            } else {
+                StringBuilder details = new StringBuilder("GPU: ").append(gpu.optString("gpu", "desconocida"))
+                        .append("\nVulkan: ").append(gpu.optString("vulkan", "desconocido"))
+                        .append("\nDriver: ").append(gpu.optString("driverName", "—"))
+                        .append(' ').append(gpu.optString("driverInfo", ""));
+                if (deviceFailed) details.append("\nNo se pudo crear el dispositivo Vulkan (VkResult ")
+                        .append(gpu.optInt("logicalDeviceResult")).append(").");
+                details.append("\nTexturas BC: ").append(gpu.optBoolean("bcTextures") ? "en la GPU" : "se convierten en la CPU");
+                if (!gpu.optString("vertexFormatsMissing").isEmpty())
+                    details.append("\nTipos de vértice sin soporte: ").append(gpu.optString("vertexFormatsMissing"));
+                org.json.JSONArray missing = gpu.optJSONArray("missing");
+                details.append("\n").append(gpu.optBoolean("compatible") && !deviceFailed
+                        ? "Compatible con el juego."
+                        : "Faltan funciones: " + (missing == null ? "sin detalle" : missing.toString()));
+                text = details.toString();
+            }
             new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                     .setTitle("Prueba del driver Vulkan").setMessage(text).setPositiveButton("Aceptar", null)
                     .setNeutralButton("Usar driver del sistema", (dialog, which) -> { GpuDrivers.select(this, ""); refreshOptions(); })
@@ -522,12 +538,60 @@ public final class LauncherActivity extends Activity {
                 .putExtra("backBuffers", Integer.parseInt(GameOptions.get(this, GameOptions.LATENCY)))
                 .putExtra("cpuTextures", GameOptions.get(this, GameOptions.TEXTURES).equals("cpu"))
                 .putExtra("onlineServer", GameOptions.onlineServer(this))
+                .putExtra("gameRoot", gameRoot().getAbsolutePath())
                 .putExtra("driverLoader", loader));
     }
 
     // ---- Storage ---------------------------------------------------------------------------------------
 
-    private static File gameRoot() { return new File(Environment.getExternalStorageDirectory(), "nfsu2"); }
+    private File gameRoot() {
+        File primary = new File(Environment.getExternalStorageDirectory(), "nfsu2");
+        if (completeGameRoot(primary)) return primary;
+
+        File[] appDirectories = getExternalFilesDirs(null);
+        if (appDirectories != null) {
+            for (File appDirectory : appDirectories) {
+                File volumeRoot = externalVolumeRoot(appDirectory);
+                if (volumeRoot == null || volumeRoot.equals(Environment.getExternalStorageDirectory())) continue;
+                File candidate = new File(volumeRoot, "nfsu2");
+                if (completeGameRoot(candidate)) return candidate;
+            }
+        }
+
+        File storage = new File("/storage");
+        File[] volumes = storage.listFiles(File::isDirectory);
+        if (volumes != null) {
+            java.util.Arrays.sort(volumes, (left, right) -> left.getAbsolutePath().compareTo(right.getAbsolutePath()));
+            for (File volume : volumes) {
+                if ("emulated".equals(volume.getName())) continue;
+                File candidate = new File(volume, "nfsu2");
+                if (completeGameRoot(candidate)) return candidate;
+            }
+        }
+        return primary;
+    }
+
+    private File externalVolumeRoot(File appDirectory) {
+        if (appDirectory == null) return null;
+        File root = appDirectory;
+        String[] expectedParents = {"files", getPackageName(), "data", "Android"};
+        for (String expected : expectedParents) {
+            if (root == null || !expected.equals(root.getName())) return null;
+            root = root.getParentFile();
+        }
+        return root;
+    }
+
+    private static boolean completeGameRoot(File root) {
+        if (!new File(root, "SPEED2.EXE").isFile()) return false;
+        for (String folder : new String[] {"CARS", "CREDITS", "FRONTEND", "GLOBAL", "LANGUAGES",
+                "MOVIES", "NIS", "SDATA", "SOUND", "SUBTITLES", "TRACKS"}) {
+            File directory = new File(root, folder);
+            String[] entries = directory.list();
+            if (!directory.isDirectory() || entries == null || entries.length == 0) return false;
+        }
+        return true;
+    }
 
     private boolean allowed() {
         return Build.VERSION.SDK_INT >= 30 ? Environment.isExternalStorageManager()

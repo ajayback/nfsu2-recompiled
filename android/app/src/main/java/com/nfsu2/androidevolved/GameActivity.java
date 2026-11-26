@@ -24,7 +24,7 @@ import android.text.InputType;
 import android.view.inputmethod.EditorInfo;
 import android.util.DisplayMetrics;
 
-/** Storage permission gateway for the fixed Internal storage/nfsu2 directory. */
+/** Storage permission gateway for the shared game-data folder. */
 public final class GameActivity extends NativeActivity {
     static { System.loadLibrary("nfsu2_android"); }
     private boolean requested;
@@ -36,6 +36,7 @@ public final class GameActivity extends NativeActivity {
     private boolean statusHidden;
     private Runnable statusHideTask;
     private static native void nativeKey(int scan, boolean down);
+    private static native void nativeSetGameRoot(String root);
     private static native boolean nativeDrivingControls();
     private static native boolean nativeGamepadUsed();
     private static native String nativeTakeNotice();
@@ -171,7 +172,7 @@ public final class GameActivity extends NativeActivity {
     private void showTextInput() {
         EditText name = new EditText(this);
         name.setSingleLine(true);
-        name.setHint("Nombre, correo o contraseña");
+        name.setHint("Nama, email, atau kata sandi");
         name.setFilters(new InputFilter[]{new InputFilter.LengthFilter(40)});
         name.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD |
                 InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
@@ -200,6 +201,7 @@ public final class GameActivity extends NativeActivity {
         dialog.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
     }
     @Override protected void onCreate(Bundle saved) {
+        nativeSetGameRoot(getIntent().getStringExtra("gameRoot"));
         super.onCreate(saved);
         inputManager=(android.hardware.input.InputManager)getSystemService(INPUT_SERVICE);
         tiltSensors=(android.hardware.SensorManager)getSystemService(SENSOR_SERVICE);
@@ -238,7 +240,7 @@ public final class GameActivity extends NativeActivity {
         status.setBackgroundColor(0xb0000000);
         status.setTextSize(18);
         status.setPadding(24, 16, 24, 16);
-        status.setText("NFSU2 Android Evolved\nComprobando memoria interna/nfsu2…");
+        status.setText("NFSU2 Android Evolved\nBuscando archivos del juego en storage/nfsu2…");
         // NativeActivity gives its main window surface to Vulkan; use a separate
         // non-interactive popup surface for the diagnostic text.
         statusWindow = new PopupWindow(status, ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -329,7 +331,7 @@ public final class GameActivity extends NativeActivity {
                     && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
         if (!allowed && !requested) {
             requested = true;
-            Toast.makeText(this, "Permite acceso a archivos para leer la carpeta nfsu2 de la memoria interna", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Permite acceso a archivos para leer la carpeta nfsu2", Toast.LENGTH_LONG).show();
             if (Build.VERSION.SDK_INT >= 30) {
                 startActivity(new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
                         Uri.parse("package:" + getPackageName())));

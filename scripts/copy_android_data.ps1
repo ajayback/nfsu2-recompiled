@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory=$true)][string]$GameRoot,
     [string]$Adb = 'adb',
-    [string]$Serial = ''
+    [string]$Serial = '',
+    [string]$DevicePath = '/sdcard/nfsu2'
 )
 $ErrorActionPreference = 'Stop'
 $resolvedRoot = (Resolve-Path -LiteralPath $GameRoot).Path
@@ -21,13 +22,13 @@ if ((Get-FileHash -LiteralPath (Join-Path $resolvedRoot 'SPEED2.EXE') -Algorithm
 foreach ($entry in $entries) {
     if (-not (Test-Path -LiteralPath (Join-Path $resolvedRoot $entry))) { throw "Missing source: $entry" }
 }
-Invoke-Adb @('shell','mkdir','-p','/sdcard/nfsu2')
+Invoke-Adb @('shell','mkdir','-p',$DevicePath)
 foreach ($entry in $entries) {
     # Do not overwrite personal progress when updating game assets.
     if ($entry -eq 'memcard') {
-        & $Adb @adbArgs shell test -d /sdcard/nfsu2/memcard
+        & $Adb @adbArgs shell test -d "$DevicePath/memcard"
         if ($LASTEXITCODE -eq 0) { Write-Output 'Keeping existing device memcard'; continue }
     }
-    Invoke-Adb @('push',(Join-Path $resolvedRoot $entry),'/sdcard/nfsu2/')
+    Invoke-Adb @('push',(Join-Path $resolvedRoot $entry),"$DevicePath/")
 }
-Write-Output 'Game files copied to Internal storage/nfsu2. PC installers/DirectX are omitted.'
+Write-Output "Game files copied to $DevicePath. PC installers/DirectX are omitted."

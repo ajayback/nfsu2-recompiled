@@ -152,7 +152,7 @@ Current state as of **October 2026**:
   ```bash
   pip install capstone pefile unicorn keystone-engine
   ```
-- Enhanced pcrecomp submodule with patches 0001–0011 applied:
+- Enhanced pcrecomp checkout with patches 0001–0014 applied:
   ```bash
   git clone https://github.com/sp00nznet/pcrecomp.git ../pcrecomp
   cd ../pcrecomp
@@ -161,8 +161,10 @@ Current state as of **October 2026**:
   ```
 
 ### Android Build
-- Android SDK Platform 35 / Min SDK 26 (Android 8.0+)
-- Android NDK (r25c or newer with Clang ARM64)
+- Android SDK Platform 35 / Min SDK 29 (Android 10+)
+- Android Gradle Plugin 8.7.3-compatible JDK; `build.bat` selects installed NDK/CMake versions
+- Prepare the pinned DXVK source and generate local game C as described in [Android build guide](docs/ANDROID_PORT.md)
+- Run `build.bat` from the repository root to create the debug APK
 - Vulkan 1.3 capable Android device (Vulkan 1.1 fallback in development)
 
 ---
@@ -172,24 +174,28 @@ Current state as of **October 2026**:
 Follow these steps to generate the C code and build the executable:
 
 ```bash
-# 1. Initialize MSVC x86 environment in Git Bash
-source scripts/vsenv.sh x86
+# Run from Git Bash. This is your own, legally obtained game installation.
 GAME="/path/to/Need for Speed Underground 2"
+mkdir -p work
 
-# 2. Normalize executable (restores relocation directory without modifying original)
+# 1. Normalize the executable (the original is not modified)
 python scripts/normalize_exe.py "$GAME/SPEED2.EXE" work/SPEED2.analysis.exe
 
-# 3. Scan seeds: vtables and RTTI
+# 2. Find extra function seeds from vtables and RTTI
 python ../pcrecomp/tools/cpp/vtable_scan.py work/SPEED2.analysis.exe --seeds work/vtable_seeds.json
 python ../pcrecomp/tools/cpp/rtti.py        work/SPEED2.analysis.exe --seeds work/rtti_seeds.json
 
-# 4. Generate function catalog with basic blocks (~5 min)
+# 3. Merge both seed lists for the cataloger
+python -c 'import json; files=["work/vtable_seeds.json","work/rtti_seeds.json"]; seeds={s["address"]:s for f in files for s in json.load(open(f, encoding="utf-8"))}; json.dump(list(seeds.values()),open("work/seeds_all.json","w"),indent=1); print(f"{len(seeds)} seeds")'
+
+# 4. Discover functions and basic blocks (several minutes)
 python scripts/run_lift.py catalog work/SPEED2.analysis.exe work/seeds_all.json work/catalog.json
 
-# 5. Lift assembly to portable C (~90 s) -> src/recomp/gen/
+# 5. Lift functions to C -> src/recomp/gen/
 python scripts/run_lift.py lift work/SPEED2.analysis.exe work/catalog.json src/recomp/gen
 
-# 6. Build and run native Windows host
+# Optional: initialize MSVC x86 only if you also build the Windows host
+source scripts/vsenv.sh x86
 scripts/build.sh
 scripts/run.sh [--fullscreen]
 ```

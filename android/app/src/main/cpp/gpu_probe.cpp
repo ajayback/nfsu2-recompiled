@@ -1,6 +1,5 @@
-// Vulkan driver report for the launcher (GpuProbeActivity, own process). Based on the MW port's
-// android_diagnostico.cpp; the checks are what this port's DXVK d3d9 device enables unconditionally
-// (D3D9DeviceEx::GetDeviceFeatures), so "compatible" means the game's device can be created.
+// Vulkan driver report for the launcher (GpuProbeActivity, own process). The required
+// core features match the ones DXVK's D3D9 device enables unconditionally.
 #include "vertex_formats.h"
 #include "vulkan_driver.h"
 #include <jni.h>
@@ -76,15 +75,14 @@ std::string probe(const char* hooks, const char* temp, const char* directory, co
     auto require = [&](bool supported, const char* name) { if (!supported) missing.emplace_back(name); };
     require(props.apiVersion >= VK_API_VERSION_1_1, "Vulkan 1.1");
     require(hasExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME), "VK_KHR_swapchain");
-    // Enabled unconditionally by the d3d9 device in this DXVK build (clip/cull distance,
-    // geometry shaders, sample-rate shading, depth clamp and non-solid fill are optional
-    // here: Mali/PowerVR drivers lack them).
+    // These are mandatory in D3D9DeviceEx::GetDeviceFeatures. The optional features
+    // (clip/cull distance, geometry shaders, sample-rate shading, depth clamp and
+    // non-solid fill) are enabled only when the Vulkan driver reports support.
     require(features.robustBufferAccess, "robustBufferAccess");
     require(features.fullDrawIndexUint32, "fullDrawIndexUint32");
     require(features.imageCubeArray, "imageCubeArray");
     require(features.independentBlend, "independentBlend");
     require(features.depthBiasClamp, "depthBiasClamp");
-    require(features.occlusionQueryPrecise, "occlusionQueryPrecise");
     require(features.shaderStorageImageWriteWithoutFormat, "shaderStorageImageWriteWithoutFormat");
 
     // DXT1/3/5 textures: on the GPU when BC is supported, otherwise decoded on the CPU (slower).
@@ -105,7 +103,8 @@ std::string probe(const char* hooks, const char* temp, const char* directory, co
         }
     }
 
-    // Capabilities alone do not prove an imported driver can create a device.
+    // Request the same mandatory Vulkan features as DXVK. A device created with
+    // an empty feature set would not prove it can initialize the game renderer.
     VkResult deviceResult = VK_ERROR_INITIALIZATION_FAILED;
     uint32_t familyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(gpu, &familyCount, nullptr);
@@ -117,9 +116,30 @@ std::string probe(const char* hooks, const char* temp, const char* directory, co
         VkDeviceQueueCreateInfo queue{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
         queue.queueFamilyIndex = family; queue.queueCount = 1; queue.pQueuePriorities = &priority;
         const char* swapchain = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+        VkPhysicalDeviceFeatures enabled{};
+        enabled.robustBufferAccess = VK_TRUE;
+        enabled.fullDrawIndexUint32 = VK_TRUE;
+        enabled.imageCubeArray = VK_TRUE;
+        enabled.independentBlend = VK_TRUE;
+        enabled.depthBiasClamp = VK_TRUE;
+        enabled.occlusionQueryPrecise = features.occlusionQueryPrecise;
+        enabled.shaderStorageImageWriteWithoutFormat = VK_TRUE;
+        enabled.geometryShader = features.geometryShader;
+        enabled.vertexPipelineStoresAndAtomics = features.vertexPipelineStoresAndAtomics;
+        enabled.depthClamp = features.depthClamp;
+        enabled.fillModeNonSolid = features.fillModeNonSolid;
+        enabled.pipelineStatisticsQuery = features.pipelineStatisticsQuery;
+        enabled.sampleRateShading = features.sampleRateShading;
+        enabled.samplerAnisotropy = features.samplerAnisotropy;
+        enabled.shaderClipDistance = features.shaderClipDistance;
+        enabled.shaderCullDistance = features.shaderCullDistance;
+        enabled.textureCompressionBC = features.textureCompressionBC;
+        enabled.multiViewport = features.multiViewport;
+        enabled.depthBounds = features.depthBounds;
         VkDeviceCreateInfo info{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
         info.queueCreateInfoCount = 1; info.pQueueCreateInfos = &queue;
         info.enabledExtensionCount = hasExtension(swapchain) ? 1 : 0; info.ppEnabledExtensionNames = &swapchain;
+        info.pEnabledFeatures = &enabled;
         VkDevice device{};
         deviceResult = vkCreateDevice(gpu, &info, nullptr, &device);
         if (deviceResult == VK_SUCCESS)
@@ -137,7 +157,8 @@ std::string probe(const char* hooks, const char* temp, const char* directory, co
         << ",\"driverName\":" << json(driver.driverName)
         << ",\"driverInfo\":" << json(driver.driverInfo)
         << ",\"logicalDeviceResult\":" << int(deviceResult)
-        << ",\"driverLoadFailed\":" << (deviceResult == VK_SUCCESS ? "false" : "true")
+        << ",\"deviceCreateFailed\":" << (deviceResult == VK_SUCCESS ? "false" : "true")
+        << ",\"driverLoadFailed\":false"
         << ",\"bcTextures\":" << (bc ? "true" : "false")
         << ",\"vertexFormatsMissing\":" << json(unsupportedD3DVertexFormats(gpu, vkGetPhysicalDeviceFormatProperties))
         << ",\"compatible\":" << (missing.empty() ? "true" : "false") << ",\"missing\":[";

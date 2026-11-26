@@ -232,6 +232,7 @@ struct Renderer {
 };
 struct Host {
     Renderer renderer;
+    std::string gameRoot;
     bool resumed = false;
     bool failed = false;
     bool guestAttempted = false;
@@ -239,6 +240,8 @@ struct Host {
     GuestBootWorker guestWorker;
 };
 static GamepadInput gamepad;
+static std::mutex gameRootMutex;
+static std::string requestedGameRoot;
 // Device ids the Java side accepted as real gamepads (updateGamepads). Events
 // from anything else never reach the pad: several MediaTek phones expose
 // sensors and side keys as joysticks whose X axis rests off centre.
@@ -310,6 +313,15 @@ static int32_t onInput(android_app*,AInputEvent* event){
 extern "C" JNIEXPORT void JNICALL Java_com_nfsu2_androidevolved_GameActivity_nativeKey(JNIEnv*,jclass,jint scan,jboolean down){
     setGuestKey(unsigned(scan),down==JNI_TRUE);
     __android_log_print(ANDROID_LOG_INFO,"NFSU2","Android touch DIK=%02x down=%d",unsigned(scan),int(down));
+}
+extern "C" JNIEXPORT void JNICALL Java_com_nfsu2_androidevolved_GameActivity_nativeSetGameRoot(JNIEnv* env,jclass,jstring root){
+    std::string path;
+    if(root){
+        const char* text=env->GetStringUTFChars(root,nullptr);
+        if(text){path=text;env->ReleaseStringUTFChars(root,text);}
+    }
+    std::lock_guard<std::mutex> lock(gameRootMutex);
+    requestedGameRoot=std::move(path);
 }
 extern "C" JNIEXPORT jboolean JNICALL Java_com_nfsu2_androidevolved_GameActivity_nativeDrivingControls(JNIEnv*,jclass){return guestDrivingControls()?JNI_TRUE:JNI_FALSE;}
 extern "C" JNIEXPORT jstring JNICALL Java_com_nfsu2_androidevolved_GameActivity_nativeTakeNotice(JNIEnv* env,jclass){
@@ -413,7 +425,9 @@ void android_main(android_app* app) {
             setGuestPaused(false);
             if(!customVulkanError.empty())throw std::runtime_error(customVulkanError);
             if (!host.renderer.device&&!d3d9RequestsSurface()&&!(customVulkanDriver&&host.guestAttempted)) {
-                checkGameData();
+                std::string preferredRoot;
+                {std::lock_guard<std::mutex> lock(gameRootMutex);preferredRoot=requestedGameRoot;}
+                host.gameRoot = findGameDataRoot(preferredRoot);
                 if(customVulkanDriver){
                     setGuestDisplaySize(unsigned(ANativeWindow_getWidth(app->window)),unsigned(ANativeWindow_getHeight(app->window)));
                 }else{
@@ -422,13 +436,13 @@ void android_main(android_app* app) {
                 }
                 if (!host.guestAttempted) {
                     host.guestAttempted = true;
-                    host.guestWorker.start(std::string(kGameRoot) + "/SPEED2.EXE");
+                    host.guestWorker.start(host.gameRoot + "/SPEED2.EXE");
                 }
             }
             auto status=host.guestWorker.status();
             if(status!=host.guestStatus){
                 host.guestStatus=status;
-                showStatus(app,("Datos accesibles: memoria interna/nfsu2\nVulkan 1.1: presentación activa\n"+status).c_str());
+                showStatus(app,("Datos accesibles: storage/nfsu2\nVulkan 1.1: presentación activa\n"+status).c_str());
             }
             if (host.renderer.device&&!host.renderer.draw()) host.renderer.stop();
         } catch (const std::exception& e) {

@@ -8,6 +8,7 @@
 #include <type_traits>
 #include <unordered_map>
 #include <cstring>
+#include <cstdio>
 #include <stdexcept>
 #ifdef __ANDROID__
 #include <android/native_window.h>
@@ -16,6 +17,13 @@
 #include <chrono>
 #include <thread>
 #include <cstdlib>
+
+namespace {
+thread_local std::string d3d9CreateError;
+}
+extern "C" void nfsD3D9SetCreateError(const char* message) {
+    d3d9CreateError = message ? message : "";
+}
 
 extern "C" IDirect3D9* Direct3DCreate9(UINT sdk);
 extern "C" void dxvkAndroidSetWindow(ANativeWindow* window);
@@ -265,6 +273,7 @@ uint32_t dispatchGuestD3D9(uint32_t token,const uint32_t* args,uint32_t* argumen
             D3DPRESENT_PARAMETERS parameters{};parameters.BackBufferWidth=p[0];parameters.BackBufferHeight=p[1];parameters.BackBufferFormat=static_cast<D3DFORMAT>(p[2]);parameters.BackBufferCount=hostBackBufferCount(p[3]);
             parameters.MultiSampleType=static_cast<D3DMULTISAMPLE_TYPE>(p[4]);parameters.MultiSampleQuality=p[5];parameters.SwapEffect=static_cast<D3DSWAPEFFECT>(p[6]);parameters.hDeviceWindow=window;
             parameters.Windowed=p[8];parameters.EnableAutoDepthStencil=p[9];parameters.AutoDepthStencilFormat=static_cast<D3DFORMAT>(p[10]);parameters.Flags=p[11];parameters.FullScreen_RefreshRateInHz=p[12];parameters.PresentationInterval=D3DPRESENT_INTERVAL_IMMEDIATE;
+            d3d9CreateError.clear();
             IDirect3DDevice9* device=nullptr;HRESULT status=d3d->CreateDevice(args[1],static_cast<D3DDEVTYPE>(args[2]),window,args[4],&parameters,&device);
             NFS_RUNTIME_LOG(ANDROID_LOG_INFO,"NFSU2","D3D9 backbuffer %ux%u CreateDevice result=%08x",parameters.BackBufferWidth,parameters.BackBufferHeight,uint32_t(status));
             // Without a device the game carries on and faults later in its own
@@ -272,8 +281,15 @@ uint32_t dispatchGuestD3D9(uint32_t token,const uint32_t* args,uint32_t* argumen
             // here with the reason instead.
             static unsigned failures=0;failures=FAILED(status)?failures+1:0;
             if(FAILED(status)&&failures<2)return status;
-            if(FAILED(status))throw std::runtime_error("La GPU no pudo crear el dispositivo grafico (Vulkan, CreateDevice "+
-                std::to_string(uint32_t(status))+"). Usa \"Probar driver\" en el launcher para ver que le falta.");
+            if(FAILED(status)){
+                char code[16];std::snprintf(code,sizeof code,"0x%08x",uint32_t(status));
+                const char* reason=status==D3DERR_NOTAVAILABLE
+                    ?"D3DERR_NOTAVAILABLE: el driver no cumple un requisito grafico de DXVK"
+                    :"fallo al inicializar DXVK";
+                throw std::runtime_error(std::string("No se pudo crear el dispositivo grafico (")+reason+", HRESULT "+
+                    code+(d3d9CreateError.empty() ? "" : ", DXVK: "+d3d9CreateError)+
+                    "). Ejecuta \"Probar driver\" en el launcher para ver los requisitos Vulkan que faltan.");
+            }
             write(args[6],wrap(device,Kind::Device));return status;
         }
         }
