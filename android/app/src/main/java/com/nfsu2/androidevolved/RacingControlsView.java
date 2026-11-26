@@ -168,12 +168,12 @@ final class RacingControlsView extends View {
         for(Control c:controls)drawControl(canvas,c);
         if(editing) {
             float w=getWidth()/scale;
-            drawToolbarButton(canvas,new RectF(w/2-250,18,w/2-150,58),"RESTABLECER");
+            drawToolbarButton(canvas,new RectF(w/2-250,18,w/2-150,58),"MEMULIHKAN");
             drawToolbarButton(canvas,new RectF(w/2-142,18,w/2-102,58),"−");
             drawToolbarButton(canvas,new RectF(w/2-94,18,w/2-54,58),"+");
-            drawToolbarButton(canvas,new RectF(w/2-46,18,w/2+58,58),"GUARDAR");
-            drawToolbarButton(canvas,new RectF(w/2+66,18,w/2+170,58),"CANCELAR");
-            drawToolbarButton(canvas,new RectF(w/2-65,70,w/2+65,106),"OPCIONES");
+            drawToolbarButton(canvas,new RectF(w/2-46,18,w/2+58,58),"MENYIMPAN");
+            drawToolbarButton(canvas,new RectF(w/2+66,18,w/2+170,58),"MEMBATALKAN");
+            drawToolbarButton(canvas,new RectF(w/2-65,70,w/2+65,106),"OPSI");
         }
         canvas.restore();
     }
@@ -338,43 +338,43 @@ final class RacingControlsView extends View {
         invalidate();return true;
     }
     private void showOptions() {
-        new AlertDialog.Builder(getContext()).setTitle("Opciones de controles")
-                .setItems(new String[]{"Estilo: clásico / Xbox / PlayStation","Conducción por inclinación","Límite de FPS","Guardar layout con nombre","Cargar layout personalizado"},(dialog,which)->{
+        new AlertDialog.Builder(getContext()).setTitle("Opsi kontrol")
+                .setItems(new String[]{"Gaya: klasik / Xbox / PlayStation","Mengemudi miring","Batas FPS","Simpan tata letak dengan nama","Muat tata letak khusus"},(dialog,which)->{
                     if(which==0)chooseStyle();else if(which==1)configureTilt.run();
                     else if(which==2)configureFrameLimit.run();else if(which==3)saveNamedLayout();else loadNamedLayout();
-                }).setNegativeButton("Cerrar",null).show();
+                }).setNegativeButton("Menutup",null).show();
     }
     private void chooseStyle() {
         String[] ids={"classic","xbox","playstation"};
-        new AlertDialog.Builder(getContext()).setTitle("Estilo de conducción")
-                .setSingleChoiceItems(new String[]{"Clásico · flechas y pedales","Xbox · volante y A / B / X / Y","PlayStation · volante y × / ○ / □ / △"},style.equals("classic")?0:style.equals("xbox")?1:2,(dialog,which)->{
+        new AlertDialog.Builder(getContext()).setTitle("Gaya mengemudi")
+                .setSingleChoiceItems(new String[]{"Klasik · panah dan pedal","Xbox · roda kemudi dan A / B / X / Y","PlayStation · roda kemudi dan × / ○ / □ / △"},style.equals("classic")?0:style.equals("xbox")?1:2,(dialog,which)->{
                     style=ids[which];layouts.edit().putString("style",style).apply();
                     layoutControls();dialog.dismiss();
-                }).setNegativeButton("Cancelar",null).show();
+                }).setNegativeButton("Membatalkan",null).show();
     }
     private void saveNamedLayout() {
-        EditText name=new EditText(getContext());name.setSingleLine();name.setHint("Nombre del layout");
+        EditText name=new EditText(getContext());name.setSingleLine();name.setHint("Nama tata letak");
         name.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(24)});
-        AlertDialog dialog=new AlertDialog.Builder(getContext()).setTitle("Guardar diseño de "+(racing?"conducción":"menú"))
-                .setView(name).setPositiveButton("Guardar",null).setNegativeButton("Cancelar",null).create();
+        AlertDialog dialog=new AlertDialog.Builder(getContext()).setTitle("Simpan desain "+(racing?"Pengemudi":"Menu")).setMessage("Tata letak akan disimpan untuk gaya "+style).setView(name)
+                .setView(name).setPositiveButton("Menyimpan",null).setNegativeButton("Membatalkan",null).create();
         dialog.setOnShowListener(ignored->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-            String value=name.getText().toString().trim();if(value.isEmpty()) {name.setError("Escribe un nombre");return;}
+            String value=name.getText().toString().trim();if(value.isEmpty()) {name.setError("Tulis nama");return;}
             try {
                 JSONObject data=new JSONObject();data.put("style",style);
                 for(Control c:controls) {JSONObject item=new JSONObject();
                     item.put("x",c.area.centerX()/(getWidth()/scale));item.put("y",c.area.centerY()/(getHeight()/scale));
                     item.put("size",c.area.width()/c.original.width());data.put(c.id,item);}
                 layouts.edit().putString("preset."+(racing?"race.":"menu.")+value,data.toString()).apply();
-                saveLayout();Toast.makeText(getContext(),"Layout guardado: "+value,Toast.LENGTH_SHORT).show();dialog.dismiss();
-            }catch(org.json.JSONException exception) {name.setError("No se pudo guardar el layout");}
+                saveLayout();Toast.makeText(getContext(),"Tata letak yang disimpan: "+value,Toast.LENGTH_SHORT).show();dialog.dismiss();
+            }catch(org.json.JSONException exception) {name.setError("Tidak dapat menyimpan tata letak");}
         }));dialog.show();
     }
     private void loadNamedLayout() {
         String prefix="preset."+(racing?"race.":"menu.");ArrayList<String> names=new ArrayList<>();
         for(String key:layouts.getAll().keySet())if(key.startsWith(prefix))names.add(key.substring(prefix.length()));
         java.util.Collections.sort(names);
-        if(names.isEmpty()) {Toast.makeText(getContext(),"Todavía no hay layouts guardados para este modo",Toast.LENGTH_SHORT).show();return;}
-        new AlertDialog.Builder(getContext()).setTitle("Cargar layout").setItems(names.toArray(new String[0]),(dialog,which)->{
+        if(names.isEmpty()) {Toast.makeText(getContext(),"Belum ada tata letak yang disimpan untuk mode ini",Toast.LENGTH_SHORT).show();return;}
+        new AlertDialog.Builder(getContext()).setTitle("Tata letak beban").setItems(names.toArray(new String[0]),(dialog,which)->{
             try {
                 JSONObject data=new JSONObject(layouts.getString(prefix+names.get(which),"{}"));
                 style=data.getString("style");SharedPreferences.Editor save=layouts.edit().putString("style",style);
@@ -382,8 +382,8 @@ final class RacingControlsView extends View {
                     JSONObject item=data.getJSONObject(id);save.putFloat(id+".x",(float)item.getDouble("x"))
                             .putFloat(id+".y",(float)item.getDouble("y")).putFloat(id+".size",(float)item.getDouble("size"));}
                 save.apply();layoutControls();
-            }catch(org.json.JSONException exception) {Toast.makeText(getContext(),"No se pudo cargar el layout",Toast.LENGTH_SHORT).show();}
-        }).setNegativeButton("Cancelar",null).show();
+            }catch(org.json.JSONException exception) {Toast.makeText(getContext(),"Tata letak tidak dapat dimuat",Toast.LENGTH_SHORT).show();}
+        }).setNegativeButton("Membatalkan",null).show();
     }
 
     // ---- Input -------------------------------------------------------------------------------------------

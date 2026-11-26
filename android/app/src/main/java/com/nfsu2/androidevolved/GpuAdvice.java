@@ -89,19 +89,19 @@ final class GpuAdvice {
     static String advice(Family family) {
         switch (family) {
             case ADRENO_TURNIP:
-                return "Recomendado para tu Snapdragon: Turnip (Mesa) para Adreno 6xx/7xx si el driver del sistema va lento o con errores gráficos. PanVK no sirve para Adreno.";
+                return "Direkomendasikan untuk Snapdragon Anda: Turnip (Mesa) untuk Adreno 6xx/7xx jika driver sistem lambat atau mengalami kesalahan grafis. PanVK tidak berfungsi untuk Adreno.";
             case ADRENO_SYSTEM:
-                return "Recomendado: el driver del sistema. Turnip para esta Adreno es experimental.";
+                return "Direkomendasikan: driver sistem. Lobak untuk Adreno ini bersifat eksperimental.";
             case MALI_VALHALL:
-                return "Recomendado para tu GPU Mali: PanVK (Mesa) si el driver del sistema va lento o con errores gráficos. Turnip no sirve para Mali.";
+                return "Direkomendasikan untuk GPU Mali Anda: PanVK (Mesa) jika driver sistem lambat atau mengalami kesalahan grafis. Turnip tidak bekerja untuk Mali.";
             case MALI_OLDER:
-                return "Recomendado: el driver del sistema. PanVK en Mali-G52/G72/G76 o más antiguas es experimental, y Turnip no sirve para Mali.";
+                return "Direkomendasikan: driver sistem. PanVK di Mali-G52/G72/G76 atau yang lebih lama bersifat eksperimental, dan Turnip tidak berfungsi untuk Mali.";
             case POWERVR:
-                return "Recomendado: el driver del sistema. No hay un driver alternativo estable para PowerVR; Turnip y PanVK no funcionan en esta GPU.";
+                return "Direkomendasikan: driver sistem. Tidak ada driver alternatif yang stabil untuk PowerVR; Turnip dan PanVK tidak berfungsi pada GPU ini.";
             case XCLIPSE:
-                return "Recomendado: el driver del sistema. Turnip y PanVK no funcionan en las GPU Xclipse de Samsung.";
+                return "Direkomendasikan: driver sistem. Turnip dan PanVK tidak berfungsi pada GPU Samsung Xclipse.";
             default:
-                return "Recomendado: el driver del sistema.";
+                return "Direkomendasikan: driver sistem.";
         }
     }
 
