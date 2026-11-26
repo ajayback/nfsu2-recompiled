@@ -262,7 +262,7 @@ final class Diagnostics {
                                     readLimited(trace));
                             traceAdded = true;
                         }
-                    } catch (IOException error) { info.append("Jejak tidak tersedia: ").append(error).append('\n'); }
+                    } catch (IOException error) { info.append("Jejak tidak tersedia : ").append(error).append('\n'); }
                 }
             }
         } catch (RuntimeException error) { info.append(error); }

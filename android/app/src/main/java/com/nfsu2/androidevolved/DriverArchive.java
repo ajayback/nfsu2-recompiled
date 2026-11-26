@@ -18,7 +18,7 @@ final class DriverArchive {
             ZipEntry entry;
             byte[] buffer = new byte[65536];
             while ((entry = zip.getNextEntry()) != null) {
-                if (++entries > 1024) throw new IOException("ZIP berisi terlalu banyak file.");
+                if (++entries > 1024) throw new IOException("ZIP berisi terlalu banyak file. ");
                 String name = entry.getName();
                 File file = new File(root, name);
                 if (name.startsWith("/") || name.contains("\\") || name.contains(":") || name.split("/").length > 32 ||
